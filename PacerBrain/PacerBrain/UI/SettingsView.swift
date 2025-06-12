@@ -2,17 +2,26 @@
 //  SettingsView.swift
 //  PacerBrain
 //
-//  Created by Nicholas Dorn on 5/21/25.
+//  Created by Nicholas Dorn on 6/4/25.
 //
+
 
 import SwiftUI
 
 struct SettingsView: View {
-    var body: some View {
-        Text("Settings")
-    }
-}
+    @Bindable var settings: AppSettingsStore
 
-#Preview {
-    SettingsView()
+    var body: some View {
+        Form {
+            Section(header: Text("Units")) {
+                Picker("Unit System", selection: $settings.unitSystem) {
+                    ForEach(UnitSystem.allCases, id: \.self) { system in
+                        Text(system.rawValue).tag(system)
+                    }
+                }
+                .pickerStyle(.segmented)
+            }
+        }
+        .navigationTitle("Settings")
+    }
 }

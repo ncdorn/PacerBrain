@@ -10,14 +10,16 @@ import SwiftData
 
 
 @Model
-class PerformanceCurve<Dimension>: ObservableObject {
-    /// Ascending by `duration`.
-    @Attribute(.externalStorage)            // stored efficiently in SwiftData
-    
-    // MARK: Data In
-    var points: [PerformancePoint]
+final class PerformanceCurve: ObservableObject {
+    @Relationship(deleteRule: .cascade)
+    var points: [PerformancePoint] {
+            didSet {
+                points.sort { $0.duration < $1.duration }
+            }
+        }
+
     var sport: Sport
-    
+
     var title: String {
         switch sport {
         case .bike: return "Bike Power Curve"
@@ -25,71 +27,43 @@ class PerformanceCurve<Dimension>: ObservableObject {
         case .swim: return "Swim Velocity Curve"
         }
     }
-    var distances: [Double]?
-    
-    
-    // MARK: – Designated Init
-    /// Initialize directly from already-computed Measurements.
-    init(points: [PerformancePoint], sport: Sport) {
+
+    init(points: [PerformancePoint] = [], sport: Sport) {
         self.points = points.sorted { $0.duration < $1.duration }
-        self.sport  = sport
+        self.sport = sport
     }
 
-    // MARK: – Convenience Inits
-
-    /// From raw output values (watts or m/s), exactly like before.
-    convenience init(
-        outputs:   [Double],
-        durations: [TimeInterval],
-        sport:     Sport
-    ) {
-
-        let points = zip(durations, outputs).map { duration, output in
-            switch sport {
-            case .bike: PerformancePoint(duration: duration, output: output, unit: UnitPower.watts)
-            case .swim, .run: PerformancePoint(duration: duration, output: output, unit: UnitSpeed.metersPerSecond)
-            }
+    convenience init(outputs: [Double], durations: [TimeInterval], sport: Sport) {
+        let unit = sport == .bike ? "W" : "m/s"
+        let points = zip(durations, outputs).map {
+            PerformancePoint(duration: $0.0, outputValue: $0.1, unitSymbol: unit)
         }
-
         self.init(points: points, sport: sport)
     }
 
-    /// From distances + times → computes velocities for you (only for swim/run).
-    convenience init(
-        distancesM: [Double],
-        durations: [TimeInterval],
-        sport:     Sport
-    ) {
-        precondition(
-            sport == .run || sport == .swim,
-            "Distance-based init only valid for run/swim curves"
-        )
-
+    convenience init(distancesM: [Double], durations: [TimeInterval], sport: Sport) {
+        precondition(sport == .run || sport == .swim, "Distance-based init only valid for run/swim curves")
+        let unit = "m/s"
         let points = zip(durations, distancesM).map { duration, dist in
             let speedMS = dist / duration
-            return PerformancePoint(duration: duration, output: speedMS, unit: UnitSpeed.metersPerSecond, distance: dist)
+            return PerformancePoint(duration: duration, outputValue: speedMS, unitSymbol: unit, distanceValue: dist)
         }
-
         self.init(points: points, sport: sport)
     }
 
-
-    /// Convenience: highest sustainable output at the given duration
-    /// (linear interpolation, flat-spot extrapolation).
     func output(at duration: TimeInterval) -> Double? {
         guard let first = points.first else { return nil }
-        if duration <= first.duration { return first.output.value }
+        if duration <= first.duration { return first.outputValue }
+
         for (lhs, rhs) in zip(points, points.dropFirst()) {
             if duration <= rhs.duration {
                 let ratio = (duration - lhs.duration) / (rhs.duration - lhs.duration)
-                let interpolated = lhs.output.value + ratio * (rhs.output.value - lhs.output.value)
-                return interpolated
+                return lhs.outputValue + ratio * (rhs.outputValue - lhs.outputValue)
             }
         }
-        return points.last?.output.value // flat extrapolation for long durations
+        return points.last?.outputValue
     }
 
-    /// Append or replace a point, keeping the array sorted.
     func insert(_ new: PerformancePoint) {
         if let idx = points.firstIndex(where: { $0.duration == new.duration }) {
             points[idx] = new
@@ -99,47 +73,42 @@ class PerformanceCurve<Dimension>: ObservableObject {
         }
     }
 
-    /// Replace the entire curve with new mean-max data (e.g. from a workout).
     func replace(with newPoints: [PerformancePoint]) {
         points = newPoints.sorted { $0.duration < $1.duration }
     }
 }
 
 // MARK: - PerformancePoint
-
-/// One point on a mean-max curve (duration → output).
-struct PerformancePoint: Codable, Hashable {
+@Model
+class PerformancePoint: Identifiable {
+    var id: UUID
     var duration: TimeInterval
-    var id = UUID()
-    var output: Measurement<Dimension>
-    var distanceValue: Double? // distance in km
+    var outputValue: Double   // The numeric value (watts or m/s)
+    var unitSymbol: String    // "W" or "m/s" for display purposes
+    var distanceValue: Double?
+
+    init(duration: TimeInterval, outputValue: Double, unitSymbol: String, distanceValue: Double? = nil) {
+        self.id = UUID()
+        self.duration = duration
+        self.outputValue = outputValue
+        self.unitSymbol = unitSymbol
+        self.distanceValue = distanceValue
+    }
+
     var distance: Double {
         get { distanceValue ?? 0 }
         set {
-            distanceValue = newValue // distance in km
-            outputValue = newValue / duration // velocity in m/s
-            }
+            distanceValue = newValue
+            outputValue = newValue / duration
+        }
     }
-    
+
     var minutes: Double { duration.rounded(.down) / 60 }
     var seconds: Double { duration.truncatingRemainder(dividingBy: 60) }
-
-    var outputValue: Double {
-        get { output.value }
-        set { output = Measurement(value: newValue, unit: output.unit) }
-    }
-    
-    init(duration: TimeInterval, output: Double, unit: Dimension, distance: Double? = nil) {
-        self.duration = duration
-        self.output   = Measurement(value: output, unit: unit)
-        self.distanceValue = distance
-    }
-
 }
 
-// MARK: - Discipline
 
-/// Supported endurance disciplines.
+// Supported endurance disciplines.
 enum Sport: String, CaseIterable, Codable, Hashable {
     case swim, bike, run
 }

@@ -9,11 +9,14 @@
 import SwiftUI
 import Charts
 
-/// A SwiftUI view that renders a power curve as a line chart.
 struct PerformanceCurveGraphView: View {
-    /// The performance curve providing (duration → power) data points.
+
     @State private var showPoints: Bool = false
-    let curve: PerformanceCurve<Dimension>
+    let curve: PerformanceCurve
+    
+    var sortedPoints: [PerformancePoint] {
+        curve.points.sorted { $0.duration < $1.duration }
+    }
     
     var color: Color {
         switch curve.sport {
@@ -30,10 +33,10 @@ struct PerformanceCurveGraphView: View {
     }
     var body: some View {
         Chart {
-            ForEach(curve.points, id: \.self) { point in
+            ForEach(sortedPoints, id: \.self) { point in
                 LineMark(
                     x: .value("Duration (s)", point.duration),
-                    y: .value("Power (W)", point.output.value)
+                    y: .value("Power (W)", point.outputValue)
                 )
                 .interpolationMethod(.catmullRom)
                 .foregroundStyle(color)
@@ -41,7 +44,7 @@ struct PerformanceCurveGraphView: View {
                 if showPoints {
                     PointMark(
                         x: .value("Duration (s)", point.duration),
-                        y: .value("Power (W)", point.output.value)
+                        y: .value("Power (W)", point.outputValue)
                     )
                     .foregroundStyle(color)
                 }
@@ -54,10 +57,11 @@ struct PerformanceCurveGraphView: View {
 }
 
 // MARK: - Preview
+// generated with chatGPT
 struct PowerCurveGraphView_Previews: PreviewProvider {
     static var previews: some View {
         // Sample curve for preview
-        let sampleCurve = PerformanceCurve<Dimension>(
+        let sampleCurve = PerformanceCurve(
             outputs:   [400, 180, 160, 150],
             durations: [60, 120, 300, 600],
             sport: .bike

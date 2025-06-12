@@ -8,74 +8,45 @@
 import SwiftUI
 import SwiftData
 
-// MARK: - Root View
+
 struct PacerBrainView: View {
-    /// Selected item in the sidebar
-    @State private var selection: SidebarItem?
-    @State private var sampleProfile = AthleteProfile(
-            name: "Nick",
-            weightKg: 70,
-            heightCm: 175,
-            swimDistances: [100,200,400],
-            swimDurations: [60,120,300],
-            runDistances:  [1000,5000],
-            runDurations:  [240,1200],
-            bikeOutputs:   [150,200,250],
-            bikeDurations: [60, 120, 300]
-        )
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.appSettings) private var settings
+    @Environment(\.athleteProfile) private var athleteProfile
 
     var body: some View {
-        NavigationSplitView(columnVisibility: .constant(.all)) {
-            // ----- Sidebar --------------------------------------------------
-            List(SidebarItem.allCases, selection: $selection) { item in
-                NavigationLink(value: item) {
-                    Label(item.title, systemImage: item.icon)
+        TabView {
+            DashboardView()
+                .tabItem {
+                    Label("Dashboard", systemImage: "speedometer")
                 }
+
+            NavigationStack {
+                RaceList()
             }
-            .navigationTitle("PacerBrain")
-        } detail: {
-            // ----- Detail Pane ---------------------------------------------
-            switch selection {
-            case .dashboard:    DashboardView()
-            case .races:        RaceChooserView()
-            case .profile:      AthleteProfileView(profile: sampleProfile)
-            case .settings:     SettingsView()
-            default:            Text("Select an item from the sidebar.")
+            .environmentObject(athleteProfile)
+            .tabItem {
+                Label("Races", systemImage: "flag.checkered")
+            }
+
+            NavigationStack {
+                AthleteProfileView()
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarTrailing) {
+                            NavigationLink(destination: SettingsView(settings: settings)) {
+                                Image(systemName: "gearshape")
+                            }
+                        }
+                    }
+            }
+            .tabItem {
+                Label("Profile", systemImage: "person.crop.circle")
             }
         }
     }
 }
 
-// MARK: - Sidebar Routing Enum
-private enum SidebarItem: String, CaseIterable, Identifiable {
-    case dashboard
-    case races
-    case profile
-    case settings
-
-    var id: Self { self }
-
-    /// Human-readable title
-    var title: String {
-        switch self {
-        case .dashboard: "Dashboard"
-        case .races:     "Races"
-        case .profile:   "Profile"
-        case .settings:  "Settings"
-        }
-    }
-
-    /// SFSymbol for sidebar label
-    var icon: String {
-        switch self {
-        case .dashboard: "speedometer"
-        case .races:     "flag.checkered"
-        case .profile:   "person.crop.circle"
-        case .settings:  "gearshape"
-        }
-    }
-}
-
-#Preview {
+#Preview(traits: .swiftData) {
     PacerBrainView()
+        .environmentObject(PreviewData.athleteProfile)
 }

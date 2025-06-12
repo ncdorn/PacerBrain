@@ -8,30 +8,31 @@
 import Foundation
 import SwiftData
 
-// MARK: - Athlete Profile
 
 @Model
-final class AthleteProfile: ObservableObject {
-    // ---------- Identity ---------------------------------------------------
+class AthleteProfile: ObservableObject {
+
     var id       = UUID()
     var name     = "Athlete"
+    var age: Int
     var weightKg: Double
     var heightCm: Double
     var sex: Sex
 
-    // ---------- Performance Curves ----------------------------------------
-    @Relationship(deleteRule: .cascade)
-    var swimCurve: PerformanceCurve<Dimension>
 
     @Relationship(deleteRule: .cascade)
-    var bikeCurve: PerformanceCurve<Dimension>
+    var swimCurve: PerformanceCurve
 
     @Relationship(deleteRule: .cascade)
-    var runCurve: PerformanceCurve<Dimension>
+    var bikeCurve: PerformanceCurve
 
-    // ---------- Initializer -----------------------------------------------
+    @Relationship(deleteRule: .cascade)
+    var runCurve: PerformanceCurve
+
+
     init(
         name: String = "Athlete",
+        age: Int = 25,
         sex: Sex = .male,
         weightKg: Double = 75.0,
         heightCm: Double = 178.0,
@@ -43,6 +44,7 @@ final class AthleteProfile: ObservableObject {
         bikeDurations: [Double]  = []
     ) {
         self.id = UUID()
+        self.age = age
         self.sex = sex
         self.name = name
         self.weightKg = weightKg
@@ -51,24 +53,38 @@ final class AthleteProfile: ObservableObject {
         self.bikeCurve = PerformanceCurve(outputs: bikeOutputs, durations: bikeDurations, sport: .bike)
         self.runCurve = PerformanceCurve(distancesM: runDistances, durations: runDurations, sport: .run)
     }
-
-    // ---------- Derived Metrics -------------------------------------------
-    var css: Measurement<Dimension>? {
-//        guard
-//            let t400 = swimCurve.output(atDistance: 400, poolLength: 50),
-//            let t200 = swimCurve.output(atDistance: 200, poolLength: 50)
-//        else { return nil }
-//        let cssVal = (400.0 - 200.0) / (t400 - t200)          // m s⁻¹
-//        return .init(value: cssVal, unit: UnitSpeed.metersPerSecond)
-        return nil
+    
+    func performanceModel(for raceType: RaceType) -> PerformanceModel? {
+        switch raceType {
+        case .swim, .triathlonSwim:
+            return swimModel
+        case .bike, .triathlonBike:
+            return bikeModel
+        case .run, .triathlonRun:
+            return runModel
+        }
     }
 
-    var ftp: Measurement<Dimension>? {
-        Measurement(value: bikeCurve.output(at: 3600) ?? 0, unit: UnitPower.watts)
+    // ---------- Fitted Models -------------------------------------------
+    var bikeModel: CriticalPowerModel? {
+        PerformanceCurveFitter.fit3PModel(from: bikeCurve.points)
+    }
+    var bikeFTP: Double {
+        bikeModel?.output(at: 3600) ?? 0.0
     }
 
-    var criticalSpeed: Measurement<Dimension>? {
-        Measurement(value: runCurve.output(at: 360) ?? 0, unit: UnitSpeed.metersPerSecond)
+    var runModel: PowerLawModel? {
+        PerformanceCurveFitter.fitPowerLaw(from: runCurve.points)
+    }
+    var thresholdRunPace: Double {
+        runModel?.output(at: 3600) ?? 0.0
+    }
+
+    var swimModel: SwimDecayModel? {
+        PerformanceCurveFitter.fitSwimModel(from: swimCurve.points)
+    }
+    var criticalSwimSpeed: Double {
+        swimModel?.css ?? 0.0
     }
 }
 
@@ -76,5 +92,4 @@ enum Sex: String, Codable, CaseIterable, Identifiable, Hashable {
     case male, female, other
     var id: String { rawValue }
 }
-
 

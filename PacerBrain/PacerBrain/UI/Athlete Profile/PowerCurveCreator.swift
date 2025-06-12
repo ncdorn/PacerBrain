@@ -8,20 +8,19 @@
 import SwiftUI
 import SwiftData
 
-// MARK: - Root View
+
 struct PowerCurveCreator: View {
     
-    @Bindable var outputCurve: PerformanceCurve<Dimension>
+    @Bindable var outputCurve: PerformanceCurve
     @State private var isEditingPoints = false
     @State private var isCreatingPoint = false
     @State private var newMinutesText = ""
     @State private var newSecondsText = ""
     @State private var newOutputText = ""
-    @State private var commitTrigger = false // PROBABLY REMOVE THIS EVENTUALLY
     
     let distanceBased: Bool
     
-    init(outputCurve: PerformanceCurve<Dimension>, sport: Sport) {
+    init(outputCurve: PerformanceCurve, sport: Sport) {
         self.outputCurve = outputCurve
         
         switch sport {
@@ -99,23 +98,22 @@ struct PowerCurveCreator: View {
                 if let outputEntry = Double(newOutputText) {
                     if distanceBased {
                         let distanceEntry = outputEntry
-                        let output = outputEntry * 1000.0 / durationEntry
+                        let output = outputEntry / durationEntry
                         let newPoint = PerformancePoint(
                             duration: durationEntry,
-                            output: output,
-                            unit: UnitSpeed.metersPerSecond,
-                            distance: distanceEntry
+                            outputValue: output,
+                            unitSymbol: "m/s",
+                            distanceValue: distanceEntry
                         )
                         outputCurve.insert(newPoint)
                     } else {
                         let newPoint = PerformancePoint(
                             duration: durationEntry,
-                            output: outputEntry,
-                            unit: UnitPower.watts
+                            outputValue: outputEntry,
+                            unitSymbol: "W"
                         )
                         outputCurve.insert(newPoint)
                     }
-                    print("points: \(outputCurve.points)")
                     isCreatingPoint = false
                     newMinutesText = ""
                     newSecondsText = ""

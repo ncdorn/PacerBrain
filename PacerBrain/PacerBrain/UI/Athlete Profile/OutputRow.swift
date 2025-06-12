@@ -39,6 +39,12 @@ struct OutputRow: View {
         HStack {
             if distanceBased {
                 TextField("Distance (m)", text: $distanceText)
+                    .keyboardType(.numberPad)
+                    .onSubmit {
+                        if let v = Double(distanceText) {
+                            point.distanceValue = v
+                        }
+                    }
                 Text ("m in")
             } else {
                 TextField("Power (W)", text: $powerText)
@@ -76,13 +82,13 @@ struct OutputRow: View {
         HStack {
             Spacer()
             if distanceBased {
-                Text("\(Int(point.distance)) m")
+                Text("\(Int(point.distanceValue ?? 0)) m")
                 Text("in")
             } else {
-                Text("\(Int(point.output.value)) W")
+                Text("\(Int(point.outputValue)) W")
                 Text("for")
             }
-            Text(point.duration.minuteSecondString)
+            Text(formattedDuration(point.duration))
             Spacer()
             
         }
